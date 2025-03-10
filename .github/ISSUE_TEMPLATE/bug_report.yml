@@ -1,0 +1,55 @@
+name: Bug Report
+description: Create a report to receive assistance with any issues that you face during the installation of WSA and/or during the use of WSA.
+title: "[BUG]"
+labels: bug
+
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug 
+      description: A clear and concise description of what the bug is. Include screenshots if possible. 
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce the issue 
+      description: Include steps to reproduce the behaviour.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour 
+      description: A clear and concise description of what you expected to happen. 
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Downloaded Build Of WSA 
+      description: Which build of WSA did you download? Provide the name of the .zip/.7z file, and the link to the download page if possible. 
+    validations:
+      required: true
+  - type: input
+    id: winbuild
+    attributes: 
+      label: Windows build number 
+      description: You can find the build number by typing winver in the Windows search box. 
+    validations:
+      required: true
+  - type: textarea
+    id: pcspecs
+    attributes: 
+      label: PC Specification 
+      description: You can find your PC Specification by searching for msinfo32 in Windows Search and click the top result to open the System Information app. 
+    validations:
+      required: true
+  - type: textarea
+    id: other
+    attributes:
+      label: Additional context 
+      description: Add any other context about the problem here. 
+    validations:
+      required: false

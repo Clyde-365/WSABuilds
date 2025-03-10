@@ -1,0 +1,873 @@
+name: Check update
+on:
+  workflow_dispatch:
+    inputs:
+      wsa_ver:
+        type: string
+        description: WSA Version.
+        required: true
+      wsa_message:
+        type: string
+        description: WSA Update Message.
+        required: true  
+      release_type:
+        type: choice
+        options:
+          - WIF
+          - retail
+        description: Release Type
+        required: true  
+
+jobs:
+  check:
+    name: Check updates for components
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ♻️
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies 🧑‍🏭
+        run: |
+          pip3 install beautifulsoup4 lxml
+
+      - name: Create branch if not found 🏗️
+        run: |
+          git checkout -f update || git switch --discard-changes --orphan update
+
+      - name: Obtain MagiskOnWSALocal Files ✅
+        run: |
+            git clone https://github.com/LSPosed/MagiskOnWSALocal.git MagiskOnWSALocal1
+            git clone https://github.com/LSPosed/MagiskOnWSALocal.git MagiskOnWSALocal2
+
+      - name: Check Directories and Sub-Directories ☑️
+        run: tree
+
+      - name: Check Magisk Stable Version ✅
+        run: |
+            wget https://github.com/MustardChef/WSABuilds/raw/master/MagiskOnWSA/Update%20Check/MagiskStableUpdateCheck.py
+            python3 MagiskStableUpdateCheck.py
+
+      - name: Check Magisk Canary Version ☑️
+        run: |
+            wget https://github.com/MustardChef/WSABuilds/raw/master/MagiskOnWSA/Update%20Check/MagiskCanaryUpdateCheck.py
+            python3 MagiskCanaryUpdateCheck.py
+
+      - name: Check KernelSU Version ✅
+        run: |
+            wget https://github.com/MustardChef/WSABuilds/raw/master/MagiskOnWSA/Update%20Check/KernelSUUpdateCheck.py
+            python3 KernelSUUpdateCheck.py
+
+      - name: Check MindTheGapps Version ☑️
+        run: |
+            wget https://github.com/MustardChef/WSABuilds/raw/master/MagiskOnWSA/Update%20Check/MTGUpdateCheck.py
+            python3 MTGUpdateCheck.py
+
+      - name: Check GitHub ENVs
+        run: |
+            echo Magisk Canary Update Message: ${{ env.MAGISK_CANARY_MSG }}
+            echo Magisk Stable Update Message: ${{ env.MAGISK_STABLE_MSG }}
+            echo KernelSU Update Message: ${{ env.KERNEL_SU_MSG }}
+            echo MTG Update Message: ${{ env.MTG_MSG }}   
+
+      - name: Update App version 🔗
+        uses: stefanzweifel/git-auto-commit-action@v5.1.0
+        with:
+          branch: update
+          push_options: '--force'
+          file_pattern: '*.appversion'
+          commit_message: ${{ env.MSG || 'Update App Version' }}
+          create_branch: true
+          
+      - name: Delete old workflow run ❌
+        uses: Mattraks/delete-workflow-runs@v2.0.6
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 0
+          keep_minimum_runs: 0
+          delete_workflow_pattern: "Check update"
+          
+      - name: Checkout Again! 🔄
+        uses: actions/checkout@v4
+
+    outputs:
+      MAGISK_CANARY_MSG: ${{ env.MAGISK_CANARY_MSG }}
+      MAGISK_STABLE_MSG: ${{ env.MAGISK_STABLE_MSG }}
+      KERNEL_SU_MSG: ${{ env.KERNEL_SU_MSG }}
+      MTG_MSG: ${{ env.MTG_MSG }}
+
+
+  update-downloadlinks:
+    name: Update Download Links
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 🔄
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install beautifulsoup4 PyGithub lxml
+
+      - name: Check Release type and get latest version and row/column numbers 
+        run: |
+          verofwsa=${{ inputs.wsa_ver }}
+          win11x64_link="<p><a href=\"https://github.com/MustardChef/WSABuilds/releases/tag/Windows_11_${verofwsa}\"><img alt=\"win11x64downpre\" src=\"https://img.shields.io/badge/Download%20Latest%20Pre--Release%20Builds-Windows%2011%20x64-orange?style=for-the-badge&amp;logo=windows11\"/></a></p>"
+          win11arm64_link="<p><a href=\"https://github.com/MustardChef/WSABuilds/releases/tag/Windows_11_${verofwsa}_arm64\"><img alt=\"win11arm64downpre\" src=\"https://img.shields.io/badge/Download%20Latest%20Pre--Release%20Builds-Windows%2011%20arm64-orange?style=for-the-badge&amp;logo=windows11\"/></a></p>"
+          win10x64_link="<p><a href=\"https://github.com/MustardChef/WSABuilds/releases/tag/Windows_10_${verofwsa}\"><img alt=\"win10x64down\" src=\"https://img.shields.io/badge/Download%20Latest%20Pre--Release%20Builds-Windows%2010%20x64-orange?style=for-the-badge&amp;logo=windows\"/></a></p>"
+          win11x64_link_retail="<p><a href=\"https://github.com/MustardChef/WSABuilds/releases/tag/Windows_11_${verofwsa}\"><img alt=\"win11x64downstable\" src=\"https://img.shields.io/badge/Download%20Latest%20Stable%20Builds-Windows%2011%20x64-blue?style=for-the-badge&amp;logo=windows11\"/></a></p>"
+          win11arm64_link_retail="<p><a href=\"https://github.com/MustardChef/WSABuilds/releases/tag/Windows_11_${verofwsa}_arm64\"><img alt=\"win11arm64downstable\" src=\"https://img.shields.io/badge/Download%20Latest%20Stable%20Builds-Windows%2011%20arm64-blue?style=for-the-badge&amp;logo=windows11\"/></a></p>"
+          win10x64_link_retail="<p><a href=\"https://github.com/MustardChef/WSABuilds/releases/tag/Windows_10_${verofwsa}\"><img alt=\"win10x64down\" src=\"https://img.shields.io/badge/Download%20Latest%20Stable%20Builds-Windows%2010%20x64-blue?style=for-the-badge&amp;logo=windows\"/></a></p>"
+          echo "LINK_FOR_W11X64=$win11x64_link" >> $GITHUB_ENV
+          echo "LINK_FOR_W11ARM64=$win11arm64_link" >> $GITHUB_ENV
+          echo "LINK_FOR_W10X64=$win10x64_link" >> $GITHUB_ENV
+          echo "LATEST_VER=$verofwsa" >> $GITHUB_ENV
+          echo "LINK_FOR_W11X64_RETAIL=$win11x64_link_retail" >> $GITHUB_ENV
+          echo "LINK_FOR_W11ARM64_RETAIL=$win11arm64_link_retail" >> $GITHUB_ENV
+          echo "LINK_FOR_W10X64_RETAIL=$win10x64_link_retail" >> $GITHUB_ENV
+          
+      - name: Print environment variables
+        run: |
+            echo "LINK_FOR_W11X64_RETAIL=$LINK_FOR_W11X64_RETAIL"
+            echo "LINK_FOR_W11ARM64_RETAIL=$LINK_FOR_W11ARM64_RETAIL"
+            echo "LINK_FOR_W10X64_RETAIL=$LINK_FOR_W10X64_RETAIL"
+            echo "LINK_FOR_W11X64=$LINK_FOR_W11X64"
+            echo "LINK_FOR_W11ARM64=$LINK_FOR_W11ARM64"
+            echo "LINK_FOR_W10X64=$LINK_FOR_W10X64"
+            echo "LATEST_VER_RETAIL=$LATEST_VER"
+            
+      - name: Replace Link in README.md for Download Links Table for the WSA ${{ env.LATEST_VER }} update
+        if: inputs.release_type == 'WIF'
+        run: python "./MagiskOnWSA/Update Check/update-downloadlinks.py"
+        env:
+          LINK_FOR_W11X64: ${{ env.LINK_FOR_W11X64 }}
+          LINK_FOR_W11ARM64: ${{ env.LINK_FOR_W11ARM64 }}
+          LINK_FOR_W10X64: ${{ env.LINK_FOR_W10X64 }}
+          RELEASE_TYPE: "WIF"
+          LATEST_VER: ${{ env.LATEST_VER }}
+
+      - name: Replace Link in README.md for Download Links Table for the WSA ${{ env.LATEST_VER }} update
+        if: inputs.release_type == 'retail'
+        run: python "./MagiskOnWSA/Update Check/update-downloadlinks.py"
+        env:
+          LINK_FOR_W11X64: ${{ env.LINK_FOR_W11X64_RETAIL }}
+          LINK_FOR_W11ARM64: ${{ env.LINK_FOR_W11ARM64_RETAIL }}
+          LINK_FOR_W10X64: ${{ env.LINK_FOR_W10X64_RETAIL }}
+          RELEASE_TYPE: "retail"
+          LATEST_VER: ${{ env.LATEST_VER }}
+
+      - name: Commit and push if it changed
+        run: |
+          git diff
+          git config --global user.email "68516357+MustardChef@users.noreply.github.com"
+          git config --global user.name "MustardChef"
+          git commit -am "Update Download Links for Update: ${{ env.LATEST_VER }}" || exit 0
+          git pull --rebase origin master
+          git push
+
+  check-and-create-tag:
+    name: Creates the release tags
+    needs: [check, update-downloadlinks]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 🔄
+        uses: actions/checkout@v4
+
+      - name: Prepare release tag 🏷️
+        id: releasetag
+        shell: bash
+        run: |
+          currentver=${{ inputs.wsa_ver }}
+          echo "WSA_VER=$currentver" >> $GITHUB_ENV
+          echo "WIN11X64_TAG=Windows_11_$currentver" >> $GITHUB_ENV
+          echo "WIN11ARM64_TAG=Windows_11_${currentver}_arm64" >> $GITHUB_ENV
+          echo "WIN10X64_TAG=Windows_10_$currentver" >> $GITHUB_ENV
+                
+      - name: Run Tag Checks for Windows 11 x64 Releases
+        uses: mukunku/tag-exists-action@v1.6.0
+        id: checkTag1
+        with:
+          tag: ${{ env.WIN11X64_TAG }}
+          repo: 'MustardChef/WSABuilds'
+      - run: echo ${{ steps.checkTag1.outputs.exists }}
+      
+      - name: Stop workflow if tag exists
+        if: steps.checkTag.outputs.exists == 'true'
+        run: exit 1
+
+      - name: Run Tag Checks for Windows 11 arm64 Releases
+        uses: mukunku/tag-exists-action@v1.6.0
+        id: checkTag2
+        with:
+          tag: ${{ env.WIN11ARM64_TAG }}
+          repo: 'MustardChef/WSABuilds'
+      - run: echo ${{ steps.checkTag.outputs.exists }}
+      
+      - name: Stop workflow if tag exists
+        if: steps.checkTag2.outputs.exists == 'true'
+        run: exit 1
+
+      - name: Run Tag Checks for Windows 10 x64 Releases
+        uses: mukunku/tag-exists-action@v1.6.0
+        id: checkTag3
+        with:
+          tag: ${{ env.WIN10X64_TAG }}
+          repo: 'MustardChef/WSABuilds'
+      - run: echo ${{ steps.checkTag.outputs.exists }}
+      
+      - name: Stop workflow if tag exists
+        if: steps.checkTag3.outputs.exists == 'true'
+        run: exit 1
+        
+      - name: Download Release Notes (WIF) 📥
+        if: inputs.release_type == 'WIF'
+        run: |
+          wget https://gist.github.com/MustardChef/edb0dfc50ab4942cd5914cef6a81602e/raw/ -P ${{ github.workspace }} -O Windows11x64.md
+          wget https://gist.github.com/MustardChef/3ae3343bb98f6e158ce951ec09fd3661/raw/ -P ${{ github.workspace }} -O Windows11arm64.md
+          wget https://gist.github.com/MustardChef/f2ebafde3a3072cac7e6f726da3ffa50/raw/ -P ${{ github.workspace }} -O Windows10x64.md
+          ls
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+
+      - name: Download Release Notes (RETAIL) 📥
+        if: inputs.release_type == 'retail'
+        run: |
+          wget https://gist.github.com/MustardChef/788d12344916043a7a3df9c1165b8843/raw/a8084d98b28cf650a60c74f3abf0484640bd36b7/Windows11x64retail.md -P ${{ github.workspace }} -O Windows11x64.md
+          wget https://gist.github.com/MustardChef/102fd29f091ff5f727cb7b508bd1433e/raw/3e6b97d18d28f0daefcdc7c6cfb6e62677ab40c5/Windows11arm64retail.md -P ${{ github.workspace }} -O Windows11arm64.md
+          wget https://gist.github.com/MustardChef/5b9c3dad6c3fc93f98209f0c15efc0fe/raw/5886a7c07f40b1b716dc9ab1cfb6b28326dde552/Windows10x64retail.md -P ${{ github.workspace }} -O Windows10x64.md
+          ls
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+            
+      - name: Update Release Notes for Windows 11 x64 notes📝
+        run: |
+            import os
+            import re
+            from datetime import datetime
+            date = datetime.utcnow().strftime('%d/%m/%Y')
+            time = datetime.utcnow().strftime('%H:%M:%S')
+            file_path = os.path.join(os.environ['GITHUB_WORKSPACE'], 'Windows11x64.md')
+            with open(file_path, 'r') as file:
+                file_data = file.read()
+            def custom_escape(string):
+                return string.replace('\\', '')
+            file_data = re.sub('<<DATEOFRELEASE>>', date, file_data)
+            file_data = re.sub('<<TIMEOFRELEASE>>', time, file_data)
+            file_data = re.sub('<<REASONFORRELEASE>>', 'Initial Release', file_data)
+            file_data = re.sub('<<WSAANDROIDVERSION>>', 'Android 13', file_data)
+            file_data = re.sub('<<MTGPACKAGENAME>>', custom_escape(os.environ['MTG_MSG']), file_data)
+            file_data = re.sub('<<MAGISKCANARYVERSION>>', custom_escape(os.environ['MAGISK_CANARY_MSG']), file_data)
+            file_data = re.sub('<<MAGISKSTABLEVERSION>>', custom_escape(os.environ['MAGISK_STABLE_MSG']), file_data)
+            file_data = re.sub('<<KERNELSUVERSION>>', custom_escape(os.environ['KERNEL_SU_MSG']), file_data)
+            with open(file_path, 'w') as file:
+                file.write(file_data)
+        shell: python  
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+          MTG_MSG: ${{ needs.check.outputs.MTG_MSG }}
+          MAGISK_CANARY_MSG: ${{ needs.check.outputs.MAGISK_CANARY_MSG }}
+          MAGISK_STABLE_MSG: ${{ needs.check.outputs.MAGISK_STABLE_MSG }}
+          KERNEL_SU_MSG: ${{ needs.check.outputs.KERNEL_SU_MSG }} 
+
+      - name: Update Release Notes for Windows 11 arm64 notes📝
+        run: |
+            import os
+            import re
+            from datetime import datetime
+            date = datetime.utcnow().strftime('%d/%m/%Y')
+            time = datetime.utcnow().strftime('%H:%M:%S')
+            file_path = os.path.join(os.environ['GITHUB_WORKSPACE'], 'Windows11arm64.md')
+            with open(file_path, 'r') as file:
+                file_data = file.read()
+            def custom_escape(string):
+                return string.replace('\\', '')
+            file_data = re.sub('<<DATEOFRELEASE>>', date, file_data)
+            file_data = re.sub('<<TIMEOFRELEASE>>', time, file_data)
+            file_data = re.sub('<<REASONFORRELEASE>>', 'Initial Release', file_data)
+            file_data = re.sub('<<WSAANDROIDVERSION>>', 'Android 13', file_data)
+            file_data = re.sub('<<MTGPACKAGENAME>>', custom_escape(os.environ['MTG_MSG']), file_data)
+            file_data = re.sub('<<MAGISKCANARYVERSION>>', custom_escape(os.environ['MAGISK_CANARY_MSG']), file_data)
+            file_data = re.sub('<<MAGISKSTABLEVERSION>>', custom_escape(os.environ['MAGISK_STABLE_MSG']), file_data)
+            file_data = re.sub('<<KERNELSUVERSION>>', custom_escape(os.environ['KERNEL_SU_MSG']), file_data)
+            with open(file_path, 'w') as file:
+                file.write(file_data)
+        shell: python  
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+          MTG_MSG: ${{ needs.check.outputs.MTG_MSG }}
+          MAGISK_CANARY_MSG: ${{ needs.check.outputs.MAGISK_CANARY_MSG }}
+          MAGISK_STABLE_MSG: ${{ needs.check.outputs.MAGISK_STABLE_MSG }}
+          KERNEL_SU_MSG: ${{ needs.check.outputs.KERNEL_SU_MSG }} 
+
+      - name: Update Release Notes for Windows 10 x64 notes📝
+        run: |
+            import os
+            import re
+            from datetime import datetime
+            date = datetime.utcnow().strftime('%d/%m/%Y')
+            time = datetime.utcnow().strftime('%H:%M:%S')
+            file_path = os.path.join(os.environ['GITHUB_WORKSPACE'], 'Windows10x64.md')
+            with open(file_path, 'r') as file:
+                file_data = file.read()
+            def custom_escape(string):
+                return string.replace('\\', '')
+            file_data = re.sub('<<DATEOFRELEASE>>', date, file_data)
+            file_data = re.sub('<<TIMEOFRELEASE>>', time, file_data)
+            file_data = re.sub('<<REASONFORRELEASE>>', 'Initial Release', file_data)
+            file_data = re.sub('<<WSAANDROIDVERSION>>', 'Android 13', file_data)
+            file_data = re.sub('<<MTGPACKAGENAME>>', custom_escape(os.environ['MTG_MSG']), file_data)
+            file_data = re.sub('<<MAGISKCANARYVERSION>>', custom_escape(os.environ['MAGISK_CANARY_MSG']), file_data)
+            file_data = re.sub('<<MAGISKSTABLEVERSION>>', custom_escape(os.environ['MAGISK_STABLE_MSG']), file_data)
+            file_data = re.sub('<<KERNELSUVERSION>>', custom_escape(os.environ['KERNEL_SU_MSG']), file_data)
+            with open(file_path, 'w') as file:
+                file.write(file_data)
+        shell: python  
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+          MTG_MSG: ${{ needs.check.outputs.MTG_MSG }}
+          MAGISK_CANARY_MSG: ${{ needs.check.outputs.MAGISK_CANARY_MSG }}
+          MAGISK_STABLE_MSG: ${{ needs.check.outputs.MAGISK_STABLE_MSG }}
+          KERNEL_SU_MSG: ${{ needs.check.outputs.KERNEL_SU_MSG }} 
+
+      - name: Create Tag and Release for Windows 11 arm64 release ✍🏼
+        if: inputs.release_type == 'WIF'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.WIN11ARM64_TAG }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body_path: ${{github.workspace}}/Windows11arm64.md
+          name: WSABuilds LTS ${{ inputs.wsa_message }} for Windows 11 arm64
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+
+      - name: Create Tag and Release for Windows 10 x64 release ✍🏼
+        if: inputs.release_type == 'WIF'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.WIN10X64_TAG }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body_path: ${{github.workspace}}/Windows10x64.md
+          name: WSABuilds LTS ${{ inputs.wsa_message }} for Windows 10 x64
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+  
+      - name: Create Tag and Release for Windows 11 x64 release ✍🏼
+        if: inputs.release_type == 'WIF'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.WIN11X64_TAG }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body_path: ${{github.workspace}}/Windows11x64.md
+          name: WSABuilds LTS ${{ inputs.wsa_message }} for Windows 11 x64
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+
+      - name: Create Tag and Release for Windows 11 arm64 release ✍🏼
+        if: inputs.release_type == 'retail'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.WIN11ARM64_TAG }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body_path: ${{github.workspace}}/Windows11arm64.md
+          name: Windows Subsystem For Android ${{ inputs.wsa_message }} for Windows 11 arm64
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+
+      - name: Create Tag and Release for Windows 10 x64 release ✍🏼
+        if: inputs.release_type == 'retail'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.WIN10X64_TAG }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body_path: ${{github.workspace}}/Windows10x64.md
+          name: Windows Subsystem For Android ${{ inputs.wsa_message }} for Windows 10 x64
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+  
+      - name: Create Tag and Release for Windows 11 x64 release ✍🏼
+        if: inputs.release_type == 'retail'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.WIN11X64_TAG }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body_path: ${{github.workspace}}/Windows11x64.md
+          name: Windows Subsystem For Android ${{ inputs.wsa_message }} for Windows 11 x64
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}  
+
+  build_x64_no_root_gapps_remove_amazon_redfin:
+    name: Build for x64 as Redfin with No Root, GApps and No Amazon Appstore
+    if: inputs.release_type == 'WIF'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build.yml
+    with:
+      arch: x64
+      root: none
+      gapps: --install-gapps
+      gappsver: MindTheGapps
+      amazonflag: --remove-amazon
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_x64_no_root_gapps_redfin:
+    name: Build for x64 as Redfin with No Root, GApps
+    if: inputs.release_type == 'WIF'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build.yml
+    with:
+      arch: x64
+      root: none
+      gapps: --install-gapps
+      gappsver: MindTheGapps
+      amazonflag: ""
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_x64_no_root_no_gapps_remove_amazon_redfin:
+    name: Build for x64 as Redfin with No Root, No GApps and No Amazon Appstore
+    if: inputs.release_type == 'WIF'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build.yml
+    with:
+      arch: x64
+      root: none
+      gapps: ""
+      gappsver: none
+      amazonflag: --remove-amazon
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_x64_no_root_no_gapps_redfin:
+    name: Build for x64 as Redfin with No Root, No GApps
+    if: inputs.release_type == 'WIF'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build.yml
+    with:
+      arch: x64
+      root: none
+      gapps: ""
+      gappsver: none
+      amazonflag: ""
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_x64_kernelsu_gapps_remove_amazon_redfin:
+    name: Build for x64 as Redfin with KernelSU, GApps and No Amazon Appstore
+    if: inputs.release_type == 'WIF'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build_old.yml
+    with:
+      arch: x64
+      root: kernelsu
+      gapps: --install-gapps
+      gappsver: MindTheGapps
+      amazonflag: --remove-amazon
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_x64_magisk_gapps_redfin:
+    name: Build for x64 as Redfin with Magisk, GApps
+    if: inputs.release_type == 'WIF'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build.yml
+    with:
+      arch: x64
+      root: magisk
+      gapps: --install-gapps
+      gappsver: MindTheGapps
+      amazonflag: ""
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_x64_magisk_no_gapps_remove_amazon_redfin:
+    name: Build for x64 as Redfin with Magisk, No GApps and No Amazon Appstore
+    if: inputs.release_type == 'WIF'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build.yml
+    with:
+      arch: x64
+      root: magisk
+      gapps: ""
+      gappsver: none
+      amazonflag: --remove-amazon
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_x64_magisk_canary_gapps_remove_amazon_redfin:
+    name: Build for x64 as Redfin with Magisk Canary, GApps and No Amazon Appstore
+    if: inputs.release_type == 'WIF'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build.yml
+    with:
+      arch: x64
+      root: magisk
+      gapps: --install-gapps
+      gappsver: MindTheGapps
+      amazonflag: --remove-amazon
+      magiskver: canary
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_arm64_no_root_gapps_remove_amazon_redfin:
+    name: Build for arm64 as Redfin with No Root, GApps and No Amazon Appstore
+    if: inputs.release_type == 'WIF'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/buildarm64.yml
+    with:
+      arch: arm64
+      root: none
+      gapps: --install-gapps
+      gappsver: MindTheGapps
+      amazonflag: --remove-amazon
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_arm64_no_root_gapps_redfin:
+    name: Build for arm64 as Redfin with No Root, GApps
+    if: inputs.release_type == 'WIF'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/buildarm64.yml
+    with:
+      arch: arm64
+      root: none
+      gapps: --install-gapps
+      gappsver: MindTheGapps
+      amazonflag: ""
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_arm64_no_root_no_gapps_remove_amazon_redfin:
+    name: Build for arm64 as Redfin with No Root, No GApps and No Amazon Appstore
+    if: inputs.release_type == 'WIF'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/buildarm64.yml
+    with:
+      arch: arm64
+      root: none
+      gapps: ""
+      gappsver: none
+      amazonflag: --remove-amazon
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_arm64_no_root_no_gapps_redfin:
+    name: Build for arm64 as Redfin with No Root, No GApps
+    if: inputs.release_type == 'WIF'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/buildarm64.yml
+    with:
+      arch: arm64
+      root: none
+      gapps: ""
+      gappsver: none
+      amazonflag: ""
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_arm64_kernelsu_gapps_remove_amazon_redfin:
+    name: Build for arm64 as Redfin with KernelSU, GApps and No Amazon Appstore
+    if: inputs.release_type == 'WIF'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build_arm64_old.yml
+    with:
+      arch: arm64
+      root: kernelsu
+      gapps: --install-gapps
+      gappsver: MindTheGapps
+      amazonflag: --remove-amazon
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_arm64_magisk_gapps_redfin:
+    name: Build for arm64 as Redfin with Magisk, GApps
+    if: inputs.release_type == 'WIF'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/buildarm64.yml
+    with:
+      arch: arm64
+      root: magisk
+      gapps: --install-gapps
+      gappsver: MindTheGapps
+      amazonflag: ""
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_arm64_magisk_no_gapps_remove_amazon_redfin:
+    name: Build for arm64 as Redfin with Magisk, No GApps and No Amazon Appstore
+    if: inputs.release_type == 'WIF'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/buildarm64.yml
+    with:
+      arch: arm64
+      root: magisk
+      gapps: ""
+      gappsver: none
+      amazonflag: --remove-amazon
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_arm64_magisk_canary_gapps_remove_amazon_redfin:
+    name: Build for arm64 as Redfin with Magisk Canary, GApps and No Amazon Appstore
+    if: inputs.release_type == 'WIF'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/buildarm64.yml
+    with:
+      arch: arm64
+      root: magisk
+      gapps: --install-gapps
+      gappsver: MindTheGapps
+      amazonflag: --remove-amazon
+      magiskver: canary
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit 
+
+  build_x64_no_root_gapps_remove_amazon_redfin_retail:
+    name: Build for x64 as Redfin with No Root, GApps and No Amazon Appstore
+    if: inputs.release_type == 'retail'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build_old.yml
+    with:
+      arch: x64
+      root: none
+      gapps: --install-gapps
+      gappsver: MindTheGapps
+      amazonflag: --remove-amazon
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_x64_no_root_gapps_redfin_retail:
+    name: Build for x64 as Redfin with No Root, GApps
+    if: inputs.release_type == 'retail'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build_old.yml
+    with:
+      arch: x64
+      root: none
+      gapps: --install-gapps
+      gappsver: MindTheGapps
+      amazonflag: ""
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_x64_no_root_no_gapps_remove_amazon_redfin_retail:
+    name: Build for x64 as Redfin with No Root, No GApps and No Amazon Appstore
+    if: inputs.release_type == 'retail'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build_old.yml
+    with:
+      arch: x64
+      root: none
+      gapps: ""
+      gappsver: none
+      amazonflag: --remove-amazon
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_x64_no_root_no_gapps_redfin_retail:
+    name: Build for x64 as Redfin with No Root, No GApps
+    if: inputs.release_type == 'retail'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build_old.yml
+    with:
+      arch: x64
+      root: none
+      gapps: ""
+      gappsver: none
+      amazonflag: ""
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_x64_kernelsu_gapps_remove_amazon_redfin_retail:
+    name: Build for x64 as Redfin with KernelSU, GApps and No Amazon Appstore
+    if: inputs.release_type == 'retail'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build_old.yml
+    with:
+      arch: x64
+      root: kernelsu
+      gapps: --install-gapps
+      gappsver: MindTheGapps
+      amazonflag: --remove-amazon
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_arm64_no_root_gapps_remove_amazon_redfin_retail:
+    name: Build for arm64 as Redfin with No Root, GApps and No Amazon Appstore
+    if: inputs.release_type == 'retail'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build_arm64_old.yml
+    with:
+      arch: arm64
+      root: none
+      gapps: --install-gapps
+      gappsver: MindTheGapps
+      amazonflag: --remove-amazon
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_arm64_no_root_gapps_redfin_retail:
+    name: Build for arm64 as Redfin with No Root, GApps
+    if: inputs.release_type == 'retail'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build_arm64_old.yml
+    with:
+      arch: arm64
+      root: none
+      gapps: --install-gapps
+      gappsver: MindTheGapps
+      amazonflag: ""
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_arm64_no_root_no_gapps_remove_amazon_redfin_retail:
+    name: Build for arm64 as Redfin with No Root, No GApps and No Amazon Appstore
+    if: inputs.release_type == 'retail'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build_arm64_old.yml
+    with:
+      arch: arm64
+      root: none
+      gapps: ""
+      gappsver: none
+      amazonflag: --remove-amazon
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_arm64_no_root_no_gapps_redfin_retail:
+    name: Build for arm64 as Redfin with No Root, No GApps
+    if: inputs.release_type == 'retail'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build_arm64_old.yml
+    with:
+      arch: arm64
+      root: none
+      gapps: ""
+      gappsver: none
+      amazonflag: ""
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
+  build_arm64_kernelsu_gapps_remove_amazon_redfin_retail:
+    name: Build for arm64 as Redfin with KernelSU, GApps and No Amazon Appstore
+    if: inputs.release_type == 'retail'
+    permissions: write-all
+    needs: [check, check-and-create-tag, update-downloadlinks]
+    uses: ./.github/workflows/build_arm64_old.yml
+    with:
+      arch: arm64
+      root: kernelsu
+      gapps: --install-gapps
+      gappsver: MindTheGapps
+      amazonflag: --remove-amazon
+      magiskver: stable
+      devicemodel: redfin
+      compressformat: zip
+      wsa_ver: ${{ inputs.wsa_ver }}
+    secrets: inherit
+
